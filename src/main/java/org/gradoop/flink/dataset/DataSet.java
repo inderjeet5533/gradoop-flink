@@ -1,107 +1,51 @@
 package org.gradoop.flink.dataset;
 
-import org.apache.flink.api.common.functions.FilterFunction;
-import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.common.operators.Keys;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.api.dag.Transformation;
-import org.apache.flink.api.java.Utils;
-import org.apache.flink.api.java.functions.KeySelector;
-import org.apache.flink.api.java.operators.DistinctOperator;
 import org.apache.flink.api.java.tuple.Tuple;
 import org.apache.flink.streaming.api.datastream.*;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
-public abstract class DataSet<T> {//implements DataSet<T> {
+import java.time.MonthDay;
 
-    //    private final StreamExecutionEnvironment env;
-    private final DataStream<T> internalStream;
-//    private final TypeInformation<T> typeInfo;
-//
-//    public DataSet(StreamExecutionEnvironment env, DataStream<T> internalStream, TypeInformation<T> typeInfo) {
-//        this.env = env;
-//        this.internalStream = internalStream;
-//        this.typeInfo = typeInfo;
-//    }
+public class DataSet<T> {
 
-    public DataSet(DataStream<T> internalStream) {
-        this.internalStream = internalStream;
+    private final StreamExecutionEnvironment env;
+    private DataStream<T> dataStream;
+
+    public DataSet(StreamExecutionEnvironment env, DataStream<T> dataStream) {
+        this.env = env;
+        this.dataStream = dataStream;
     }
 
-//    public StreamExecutionEnvironment getEnv() {
-//        return env;
-//    }
-
-    public DataStream<T> getInternalStream() {
-        return internalStream;
+    public StreamExecutionEnvironment getExecutionEnvironment() {
+        return env;
     }
 
-//    public TypeInformation<T> getTypeInfo() {
-//        return typeInfo;
-//    }
-
-//    @Override
-    public SingleOutputStreamOperator<T> filter(FilterFunction<T> filter) {
-        if (filter == null) {
-            throw new NullPointerException("Filter function must not be null.");
-        } else {
-            return internalStream.filter(filter);
-        }
+    private void setDataStream(DataStream<T> dataStream){
+        this.dataStream = dataStream;
     }
 
-//    @Override
-    public <T2> JoinedStreams<T, T2> join(DataStream<T2> otherStream) {
-        return internalStream.join(otherStream);
+    public <R> DataSet<R> map(MapFunction<T, R> mapper) {
+        SingleOutputStreamOperator<R> mappedStream = dataStream.map(mapper);
+        return new DataSet<>(env, mappedStream);
     }
 
-//    @Override
-    public DataStream<T> union(DataStream<T>... streams) {
-        return internalStream.union(streams);
+    public DataSet<T>  groupBy(int i) {
+        KeyedStream<T, Tuple> keyedStream = dataStream.keyBy(i);
+        this.setDataStream(keyedStream);
+        return this;
     }
 
-//    @Override
-    public <K> KeyedStream<T, K> distinct(KeySelector<T, K> key) {
-        return internalStream.keyBy(key);
+    public DataSet<T> sum(int i) {
+        KeyedStream<T, Tuple> keyedStream = (KeyedStream<T, Tuple>) dataStream;
+        this.setDataStream(keyedStream.sum(i));
+        return this;
     }
 
-    public KeyedStream<T, Tuple> distinct(int... fields) {
-        return internalStream.keyBy(fields);
-    }
-
-    public KeyedStream<T, Tuple> distinct(String... fields) {
-        return internalStream.keyBy(fields);
-    }
-
-
-//    @Override
-    public <R> SingleOutputStreamOperator<R> map(MapFunction<T, R> mapper) {
-        return internalStream.map(mapper);
-    }
-
-//    @Override
-    public <R> SingleOutputStreamOperator<R> flatMap(FlatMapFunction<T, R> flatMapper) {
-        return internalStream.flatMap(flatMapper);
-    }
-
-//    @Override
-    public <K> KeyedStream<T, K> groupBy(KeySelector<T, K> key) {
-        return internalStream.keyBy(key);
-    }
-
-//    @Override
-    public KeyedStream<T, Tuple> groupBy(int... fields) {
-        return internalStream.keyBy(fields);
-    }
-
-//    @Override
-    public KeyedStream<T, Tuple> groupBy(String... fields) {
-        return internalStream.keyBy(fields);
-    }
-
-//    @Override
-    public <T2> CoGroupedStreams<T, T2> leftOuterJoin(DataSet<T2> other) {
-        return internalStream.coGroup(other.getInternalStream());
+    public DataSet<T> union(DataStreamSource<T> fromElements) {
+        DataStream<T> unionStream = dataStream.union(fromElements);
+        this.setDataStream(unionStream);
+        return this;
     }
 
 }
